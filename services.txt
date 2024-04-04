@@ -1,0 +1,11 @@
+Glimpse:
+Compute: EC2, Lambda
+Storage: S3, DynamoDB
+Network: API Gateway
+General: SNS, Secrets Manager
+
+E-commerce:
+Compute: EC2, Lambda
+Storage: S3, DynamoDB
+Network: API Gateway
+General: SNS, Secrets Manager
