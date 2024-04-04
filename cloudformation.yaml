@@ -1,0 +1,95 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: "CloudFormation Template for Glimpse"
+
+Resources:
+  # S3 Bucket for Photo Storage
+  PhotosS3Bucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: glimpse-photos
+
+  # DynamoDB Table for Metadata/User Information
+  UserMetadataDynamoDBTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: UserMetadata
+      AttributeDefinitions:
+        - AttributeName: userId
+          AttributeType: S
+      KeySchema:
+        - AttributeName: userId
+          KeyType: HASH
+      BillingMode: PAY_PER_REQUEST
+
+  # Lambda Function for Processing
+  PhotoProcessorFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      Handler: index.handler
+      Role: !GetAtt LambdaExecutionRole.Arn
+      Code:
+        S3Bucket: your-lambda-code-bucket-name
+        S3Key: photo-processor.zip
+      Runtime: python3.8
+      Environment:
+        Variables:
+          S3_BUCKET: !Ref PhotosS3Bucket
+
+  # IAM Role for Lambda Execution
+  LambdaExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: "sts:AssumeRole"
+      Policies:
+        - PolicyName: LambdaExecutionPolicy
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action:
+                  - logs:CreateLogGroup
+                  - logs:CreateLogStream
+                  - logs:PutLogEvents
+                  - s3:GetObject
+                  - s3:PutObject
+                Resource: "*"
+
+  # API Gateway for RESTful API
+  PhotosAPI:
+    Type: AWS::ApiGateway::RestApi
+    Properties:
+      Name: PhotosAPI
+
+  # SNS Topic for Notifications
+  UpdateNotificationTopic:
+    Type: AWS::SNS::Topic
+    Properties:
+      TopicName: updateNotification
+
+  # Secrets Manager for storing sensitive information
+  DatabaseCredentialsSecret:
+    Type: AWS::SecretsManager::Secret
+    Properties:
+      Name: databaseCredentials
+      Description: "Database credentials for photo sharing app"
+      SecretString: '{"username":"user","password":"pass"}'
+
+Outputs:
+  PhotosBucketName:
+    Value: !Ref PhotosS3Bucket
+  UserMetadataTableName:
+    Value: !Ref UserMetadataDynamoDBTable
+  PhotoProcessorFunctionArn:
+    Value: !GetAtt PhotoProcessorFunction.Arn
+  PhotosAPIEndpoint:
+    Value: !Sub "https://${PhotosAPI}.execute-api.${AWS::Region}.amazonaws.com/Prod"
+  UpdateNotificationTopicArn:
+    Value: !Ref UpdateNotificationTopic
+  DatabaseCredentialsSecretArn:
+    Value: !Ref DatabaseCredentialsSecret
