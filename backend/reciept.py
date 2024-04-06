@@ -7,6 +7,9 @@ import logging
 logger = logging.getLogger()
 logger.setLevel(logging.INFO)
 
+# Access environment variables
+ddb_table_name = os.getenv('DDB_RECEIPTS_TABLE_NAME')
+
 def calculate_totals(products, discount_rate, tax_rate):
     subtotal = sum(product['productPrice'] * product['quantity'] for product in products)
     discount_amount = subtotal * (discount_rate / 100)
@@ -26,7 +29,7 @@ def generate_receipt_id():
 def insert_receipt_to_dynamodb(customer_email, receipt):
     try:
         dynamodb = boto3.client('dynamodb')
-        table_name = 'UserReceipts'
+        table_name = ddb_table_name
         receipt_id = generate_receipt_id()  # Generate a unique ID for the receipt
         dynamodb.put_item(
             TableName=table_name,
@@ -61,7 +64,7 @@ def send_receipt(email, receipt):
             Subject='Your Order Receipt',
         )
         # Optionally, delete the topic if it's not going to be reused
-        # sns.delete_topic(TopicArn=topic_arn)
+        sns.delete_topic(TopicArn=topic_arn)
     except Exception as e:
         logger.error(f"Failed to send receipt to {email}: {e}")
         raise
@@ -87,7 +90,7 @@ def generate_receipt(order_details):
     
     return "\n".join(receipt_lines)
 
-def receipt_handler(event, context):
+def lambda_handler(event, context):
     try:
         order_details = json.loads(event['body'])
         receipt = generate_receipt(order_details)
