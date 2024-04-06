@@ -1,0 +1,162 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: AWS CloudFormation for E-commerce Web Application
+
+Resources:
+  WebAppSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupName: !Join ["-", [webapp-security-group, dev]]
+      GroupDescription: "Allow HTTP/HTTPS and SSH inbound and outbound traffic"
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 80
+          ToPort: 80
+          CidrIp: 0.0.0.0/0
+        - IpProtocol: tcp
+          FromPort: 443
+          ToPort: 443
+          CidrIp: 0.0.0.0/0
+        - IpProtocol: tcp
+          FromPort: 22
+          ToPort: 22
+          CidrIp: 0.0.0.0/0
+
+  WebAppEC2Instance:
+    Type: "AWS::EC2::Instance"
+    Properties:
+      ImageId: ami-0d5eff06f840b45e9
+      InstanceType: t2.micro
+      KeyName: yash
+      SecurityGroups:
+        - !Ref WebAppSecurityGroup
+
+  MyEIP:
+    Type: AWS::EC2::EIP
+    DependsOn: WebAppEC2Instance
+    Properties:
+      InstanceId: !Ref WebAppEC2Instance
+
+  ReceiptsTable:
+    Type: "AWS::DynamoDB::Table"
+    Properties:
+      TableName: UserReceipts
+      AttributeDefinitions:
+        - AttributeName: userEmail
+          AttributeType: S
+        - AttributeName: receiptId
+          AttributeType: S # Assuming receiptId is a string unique identifier for each receipt
+      KeySchema:
+        - AttributeName: userEmail
+          KeyType: HASH # Partition key
+        - AttributeName: receiptId
+          KeyType: RANGE # Sort key
+      BillingMode: PAY_PER_REQUEST
+      # Optional: Define secondary indexes if you need to query data in a different way
+
+  MySNSTopic:
+    Type: AWS::SNS::Topic
+    Properties:
+      DisplayName: MySNSNotificationTopic
+
+  MySNSSubscription:
+    Type: AWS::SNS::Subscription
+    DependsOn: MySNSTopic
+    Properties:
+      Protocol: email
+      # Endpoint: !Ref UserEmail
+      Endpoint: "yashbest005@gmail.com"
+      TopicArn: !Ref MySNSTopic
+
+  ReceiptGenFunction:
+    Type: "AWS::Lambda::Function"
+    Properties:
+      FunctionName: receiptGenFunc
+      Handler: lambda_function.receipt_handler
+      # LabRole ARN
+      Role: arn:aws:iam::339713095314:role/LabRole
+      Code:
+        S3Bucket: term-assign-codes
+        S3Key: lambda_function.py.zip
+      Runtime: python3.8
+      Timeout: 30
+      Environment:
+        Variables:
+          SNS_TOPIC_ARN: !Ref MySNSTopic
+          DDB_TABLE_NAME: !Ref ReceiptsTable
+
+  # ApiGatewayRestApi:
+  #   Type: AWS::ApiGateway::RestApi
+  #   Properties:
+  #     ApiKeySourceType: HEADER
+  #     Description: An API Gateway with a Lambda Integration
+  #     EndpointConfiguration:
+  #       Types:
+  #         - EDGE
+  #     Name: lambda-api
+
+  ApiGatewayRestApi:
+    Type: AWS::ApiGateway::RestApi
+    Properties:
+      Name: ReceiptApi
+      Description: API Gateway for receipt generation
+      # FailOnWarnings: true
+      ApiKeySourceType: HEADER
+      EndpointConfiguration:
+        Types:
+          - EDGE
+
+  ApiGatewayResource:
+    Type: AWS::ApiGateway::Resource
+    Properties:
+      ParentId: !GetAtt ApiGatewayRestApi.RootResourceId
+      PathPart: "receipt"
+      RestApiId: !Ref ApiGatewayRestApi
+
+  ApiGatewayMethod:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref ApiGatewayRestApi
+      ResourceId: !Ref ApiGatewayResource
+      HttpMethod: POST
+      AuthorizationType: NONE
+      ApiKeyRequired: false
+      Integration:
+        ConnectionType: INTERNET
+        # Credentials: !GetAtt ApiGatewayIamRole.Arn
+        IntegrationHttpMethod: POST
+        PassthroughBehavior: WHEN_NO_MATCH
+        TimeoutInMillis: 30000
+        Type: AWS_PROXY
+        Uri: !Sub "arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${ReceiptGenFunction.Arn}/invocations"
+        MethodResponses:
+          - StatusCode: 200
+      OperationName: "lambda"
+
+  LambdaPermissionApiGateway:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !GetAtt ReceiptGenFunction.Arn
+      Action: lambda:InvokeFunction
+      Principal: apigateway.amazonaws.com
+      SourceArn: !Sub arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${ApiGatewayRestApi}/*/*/receipt
+
+  ApiGatewayModel:
+    Type: AWS::ApiGateway::Model
+    Properties:
+      ContentType: "application/json"
+      RestApiId: !Ref ApiGatewayRestApi
+      Schema: {}
+
+  ApiGatewayStage:
+    Type: AWS::ApiGateway::Stage
+    Properties:
+      DeploymentId: !Ref ApiGatewayDeployment
+      Description: Lambda API Stage v0
+      RestApiId: !Ref ApiGatewayRestApi
+      StageName: "v0"
+
+  ApiGatewayDeployment:
+    Type: AWS::ApiGateway::Deployment
+    DependsOn: ApiGatewayMethod
+    Properties:
+      RestApiId: !Ref ApiGatewayRestApi
