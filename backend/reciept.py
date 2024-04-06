@@ -1,5 +1,11 @@
 import json
 import boto3
+from datetime import datetime
+import random
+import logging
+
+logger = logging.getLogger()
+logger.setLevel(logging.INFO)
 
 def calculate_totals(products, discount_rate, tax_rate):
     subtotal = sum(product['productPrice'] * product['quantity'] for product in products)
@@ -9,14 +15,57 @@ def calculate_totals(products, discount_rate, tax_rate):
     total_amount = subtotal_after_discount + tax_amount
     return subtotal, subtotal_after_discount, total_amount
 
+
+def generate_receipt_id():
+    """Generate a unique receipt ID using the current timestamp and a random sequence."""
+    timestamp = datetime.utcnow().strftime('%Y%m%d%H%M%S%f')
+    random_sequence = random.randint(1000, 9999)
+    return f"{timestamp}-{random_sequence}"
+
+
+def insert_receipt_to_dynamodb(customer_email, receipt):
+    try:
+        dynamodb = boto3.client('dynamodb')
+        table_name = 'UserReceipts'
+        receipt_id = generate_receipt_id()  # Generate a unique ID for the receipt
+        dynamodb.put_item(
+            TableName=table_name,
+            Item={
+                'userEmail': {'S': userEmail},  # Adjusted column name to match your DynamoDB table structure
+                'receiptId': {'S': receiptId},  # Include the receiptId in the item
+                'receipt': {'S': receipt}  # The receipt content
+            }
+        )
+    except Exception as e:
+        logger.error(f"Failed to insert receipt into DynamoDB for {customer_email}: {e}")
+        raise
+
 def send_receipt(email, receipt):
-    sns = boto3.client('sns')
-    topic_arn = 'arn:aws:sns:region:account-id:topic-name'  
-    sns.publish(
-        TopicArn=topic_arn,
-        Message=receipt,
-        Subject='Your Order Receipt',
-    )
+    try:
+        # Insert the receipt into DynamoDB first
+        insert_receipt_to_dynamodb(email, receipt)
+        
+        sns = boto3.client('sns')
+        response = sns.create_topic(Name=f"receipt-{email}")
+        topic_arn = response['TopicArn']
+        
+        sns.subscribe(
+            TopicArn=topic_arn,
+            Protocol='email',
+            Endpoint=email
+        )
+        
+        sns.publish(
+            TopicArn=topic_arn,
+            Message=receipt,
+            Subject='Your Order Receipt',
+        )
+        # Optionally, delete the topic if it's not going to be reused
+        # sns.delete_topic(TopicArn=topic_arn)
+    except Exception as e:
+        logger.error(f"Failed to send receipt to {email}: {e}")
+        raise
+
 
 def generate_receipt(order_details):
     subtotal, subtotal_after_discount, total_amount = calculate_totals(
@@ -39,14 +88,23 @@ def generate_receipt(order_details):
     return "\n".join(receipt_lines)
 
 def receipt_handler(event, context):
-    order_details = json.loads(event['body'])
-    receipt = generate_receipt(order_details)
-    send_receipt(order_details['customerEmail'], receipt)
-    
-    return {
-        'statusCode': 200,
-        'body': json.dumps({'message': 'Receipt sent successfully'}),
-        'headers': {
-            'Content-Type': 'application/json'
-        },
-    }
+    try:
+        order_details = json.loads(event['body'])
+        receipt = generate_receipt(order_details)
+        send_receipt(order_details['customerEmail'], receipt)
+        return {
+            'statusCode': 200,
+            'body': json.dumps({'message': 'Receipt sent successfully'}),
+            'headers': {
+                'Content-Type': 'application/json'
+            },
+        }
+    except Exception as e:
+        logger.error(f"Failed to process receipt: {e}")
+        return {
+            'statusCode': 500,
+            'body': json.dumps({'message': 'Internal server error'}),
+            'headers': {
+                'Content-Type': 'application/json'
+            },
+        }
