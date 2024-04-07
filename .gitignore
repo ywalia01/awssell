@@ -25,3 +25,19 @@ dist-ssr
 *.pem
 
 ak.yaml
+# Ignore everything in the backend/login directory
+backend/login/*
+
+# But don't ignore the lambda_function.py file
+!backend/login/lambda_function.py
+
+# Ignore everything in the backend/login directory
+backend/register/*
+
+# But don't ignore the lambda_function.py file
+!backend/register/lambda_function.py
+
+receiptInput.json
+
+list.py.zip
+receipt.py.zip
