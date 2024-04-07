@@ -87,24 +87,26 @@ Resources:
         Fn::Base64: !Sub |
           #!/bin/bash
           # Update and install Node.js
-          sudo yum install git -y
+          sudo yum install nodejs nginx git -y
+          sudo systemctl enable nginx
+          sudo systemctl start nginx
           curl --silent --location https://rpm.nodesource.com/setup_14.x | sudo bash -
-          sudo yum install -y nodejs
           # Create a directory for the app, navigate into it
-          # mkdir -p /home/ec2-user/term-assign
-          # cd /home/ec2-user/term-assign
+          mkdir -p /home/ec2-user/csci5409-term-assign
+          cd /home/ec2-user/csci5409-term-assign
           # Fetch your app code (e.g., from S3 or Git)
           # aws s3 cp s3://<your-bucket-name>/my-react-app.zip .
           # unzip my-react-app.zip
           # OR clone from a Git repository
-          sudo git clone https://github.com/ywalia01/csci5409-term-assign.git
-          cd csci5409-term-assign
+          sudo git clone https://github.com/ywalia01/csci5409-term-assign.git .
           cd frontend
           # Install your application's dependencies
           sudo npm install
           # Build your Vite project
           sudo npm run build
-          sudo npm run preview
+          # sudo npm run preview
+          sudo cp -r /home/ec2-user/csci5409-term-assign/frontend/dist/* /usr/share/nginx/html/ || true
+          sudo systemctl restart nginx
 
   MyEIP:
     Type: AWS::EC2::EIP
@@ -272,6 +274,34 @@ Resources:
       MethodResponses:
         - StatusCode: 200
 
+  ReceiptApiOptionsMethod:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      AuthorizationType: NONE
+      HttpMethod: OPTIONS
+      ResourceId: !Ref ReceiptApiResource
+      RestApiId: !Ref ApiGatewayRestApi
+      Integration:
+        Type: MOCK
+        RequestTemplates:
+          application/json: '{"statusCode": 200}'
+        IntegrationResponses:
+          - StatusCode: 200
+            ResponseParameters:
+              method.response.header.Access-Control-Allow-Headers: "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token'"
+              method.response.header.Access-Control-Allow-Methods: "'POST,OPTIONS'"
+              method.response.header.Access-Control-Allow-Origin: "'*'"
+            ResponseTemplates:
+              application/json: ""
+      MethodResponses:
+        - StatusCode: 200
+          ResponseModels:
+            application/json: Empty
+          ResponseParameters:
+            method.response.header.Access-Control-Allow-Headers: TRUE
+            method.response.header.Access-Control-Allow-Methods: TRUE
+            method.response.header.Access-Control-Allow-Origin: TRUE
+
   # # Login Function API Gateway setup...
   # LoginApiResource:
   #   Type: AWS::ApiGateway::Resource
@@ -338,6 +368,34 @@ Resources:
       MethodResponses:
         - StatusCode: 200
 
+  ListApiOptionsMethod:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      AuthorizationType: NONE
+      HttpMethod: OPTIONS
+      ResourceId: !Ref ListApiResource
+      RestApiId: !Ref ApiGatewayRestApi
+      Integration:
+        Type: MOCK
+        RequestTemplates:
+          application/json: '{"statusCode": 200}'
+        IntegrationResponses:
+          - StatusCode: 200
+            ResponseParameters:
+              method.response.header.Access-Control-Allow-Headers: "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token'"
+              method.response.header.Access-Control-Allow-Methods: "'GET,OPTIONS'"
+              method.response.header.Access-Control-Allow-Origin: "'*'"
+            ResponseTemplates:
+              application/json: ""
+      MethodResponses:
+        - StatusCode: 200
+          ResponseModels:
+            application/json: Empty
+          ResponseParameters:
+            method.response.header.Access-Control-Allow-Headers: TRUE
+            method.response.header.Access-Control-Allow-Methods: TRUE
+            method.response.header.Access-Control-Allow-Origin: TRUE
+
   # Permissions for each Lambda to be invoked by API Gateway...
   LambdaPermissionForApiGatewayReceipt:
     Type: AWS::Lambda::Permission
@@ -392,6 +450,8 @@ Resources:
       # - ApiGatewayMethod
       - ListApiMethod
       - ReceiptApiMethod
+      - ListApiOptionsMethod
+      - ReceiptApiOptionsMethod
       # - LoginApiMethod
       # - RegisterApiMethod
 
