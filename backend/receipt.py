@@ -2,15 +2,43 @@ import json
 import boto3
 from datetime import datetime
 import random
-import logging
-
-logger = logging.getLogger()
-logger.setLevel(logging.INFO)
+import os
 
 # Access environment variables
-ddb_table_name = os.getenv('DDB_RECEIPTS_TABLE_NAME')
+# ddb_table_name = os.getenv('DDB_RECEIPTS_TABLE_NAME')
+sns_topic_arn = os.getenv('SNS_TOPIC_ARN')
+
+def get_jwt_secret():
+    secret_name = os.environ['REC_TABLE_SECRET_ARN']
+    region_name = 'us-east-1'
+    session = boto3.session.Session()
+    client = session.client(
+        service_name='secretsmanager',
+        region_name=region_name
+    )
+    
+    try:
+        get_secret_value_response = client.get_secret_value(
+            SecretId=secret_name
+        )
+    except ClientError as e:
+        raise e
+    
+    # Parse the JSON string to extract the table name
+    secret = json.loads(get_secret_value_response['SecretString'])
+    table_name = secret.get('TableName')  # Assuming the key for the table name is 'TableName'
+    
+    if not table_name:
+        raise ValueError("Table name not found in secret")
+    
+    return table_name
+
 
 def calculate_totals(products, discount_rate, tax_rate):
+    # Convert discount_rate and tax_rate to floats if they're passed as strings
+    discount_rate = float(discount_rate)
+    tax_rate = float(tax_rate)
+    
     subtotal = sum(product['productPrice'] * product['quantity'] for product in products)
     discount_amount = subtotal * (discount_rate / 100)
     subtotal_after_discount = subtotal - discount_amount
@@ -18,15 +46,16 @@ def calculate_totals(products, discount_rate, tax_rate):
     total_amount = subtotal_after_discount + tax_amount
     return subtotal, subtotal_after_discount, total_amount
 
-
 def generate_receipt_id():
     """Generate a unique receipt ID using the current timestamp and a random sequence."""
     timestamp = datetime.utcnow().strftime('%Y%m%d%H%M%S%f')
     random_sequence = random.randint(1000, 9999)
     return f"{timestamp}-{random_sequence}"
 
-
 def insert_receipt_to_dynamodb(customer_email, receipt):
+
+    ddb_table_name = get_jwt_secret()
+
     try:
         dynamodb = boto3.client('dynamodb')
         table_name = ddb_table_name
@@ -34,14 +63,14 @@ def insert_receipt_to_dynamodb(customer_email, receipt):
         dynamodb.put_item(
             TableName=table_name,
             Item={
-                'userEmail': {'S': userEmail},  # Adjusted column name to match your DynamoDB table structure
-                'receiptId': {'S': receiptId},  # Include the receiptId in the item
+                'userEmail': {'S': customer_email},  # Adjusted variable name to be consistent
+                'receiptId': {'S': receipt_id},  # Use the generated receipt ID
                 'receipt': {'S': receipt}  # The receipt content
             }
         )
     except Exception as e:
-        logger.error(f"Failed to insert receipt into DynamoDB for {customer_email}: {e}")
-        raise
+        error_message = f"Failed to insert receipt into DynamoDB for {customer_email}: {str(e)}"
+        raise Exception(error_message)
 
 def send_receipt(email, receipt):
     try:
@@ -49,8 +78,9 @@ def send_receipt(email, receipt):
         insert_receipt_to_dynamodb(email, receipt)
         
         sns = boto3.client('sns')
-        response = sns.create_topic(Name=f"receipt-{email}")
-        topic_arn = response['TopicArn']
+        # response = sns.create_topic(Name=f"CustomerReceipts")
+        # topic_arn = response['TopicArn']
+        topic_arn = sns_topic_arn
         
         sns.subscribe(
             TopicArn=topic_arn,
@@ -66,9 +96,8 @@ def send_receipt(email, receipt):
         # Optionally, delete the topic if it's not going to be reused
         sns.delete_topic(TopicArn=topic_arn)
     except Exception as e:
-        logger.error(f"Failed to send receipt to {email}: {e}")
-        raise
-
+        error_message = f"Failed to send receipt to {email}: {str(e)}"
+        raise Exception(error_message)
 
 def generate_receipt(order_details):
     subtotal, subtotal_after_discount, total_amount = calculate_totals(
@@ -95,6 +124,7 @@ def lambda_handler(event, context):
         order_details = json.loads(event['body'])
         receipt = generate_receipt(order_details)
         send_receipt(order_details['customerEmail'], receipt)
+
         return {
             'statusCode': 200,
             'body': json.dumps({'message': 'Receipt sent successfully'}),
@@ -103,10 +133,9 @@ def lambda_handler(event, context):
             },
         }
     except Exception as e:
-        logger.error(f"Failed to process receipt: {e}")
         return {
             'statusCode': 500,
-            'body': json.dumps({'message': 'Internal server error'}),
+            'body': json.dumps({'message': 'Internal server error', 'errorDetail': str(e)}),
             'headers': {
                 'Content-Type': 'application/json'
             },
