@@ -267,40 +267,61 @@ Resources:
       AuthorizationType: NONE
       ApiKeyRequired: false
       Integration:
+        ConnectionType: INTERNET
         IntegrationHttpMethod: POST
+        PassthroughBehavior: WHEN_NO_MATCH
         TimeoutInMillis: 29000
         Type: AWS_PROXY
         Uri: !Sub arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${ReceiptFunction.Arn}/invocations
-      MethodResponses:
-        - StatusCode: 200
+      # MethodResponses:
+      #   - StatusCode: 200
 
-  ReceiptApiOptionsMethod:
-    Type: AWS::ApiGateway::Method
-    Properties:
-      AuthorizationType: NONE
-      HttpMethod: OPTIONS
-      ResourceId: !Ref ReceiptApiResource
-      RestApiId: !Ref ApiGatewayRestApi
-      Integration:
-        Type: MOCK
-        RequestTemplates:
-          application/json: '{"statusCode": 200}'
-        IntegrationResponses:
-          - StatusCode: 200
-            ResponseParameters:
-              method.response.header.Access-Control-Allow-Headers: "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token'"
-              method.response.header.Access-Control-Allow-Methods: "'POST,OPTIONS'"
-              method.response.header.Access-Control-Allow-Origin: "'*'"
-            ResponseTemplates:
-              application/json: ""
-      MethodResponses:
-        - StatusCode: 200
-          ResponseModels:
-            application/json: Empty
-          ResponseParameters:
-            method.response.header.Access-Control-Allow-Headers: TRUE
-            method.response.header.Access-Control-Allow-Methods: TRUE
-            method.response.header.Access-Control-Allow-Origin: TRUE
+  # ApiGatewayMethod:
+  #   Type: AWS::ApiGateway::Method
+  #   Properties:
+  #     ApiKeyRequired: false
+  #     AuthorizationType: NONE
+  #     HttpMethod: POST
+
+  #     Integration:
+  #       ConnectionType: INTERNET
+  #       Credentials: !GetAtt ApiGatewayIamRole.Arn
+  #       IntegrationHttpMethod: POST
+  #       PassthroughBehavior: WHEN_NO_MATCH
+  #       TimeoutInMillis: 29000
+  #       Type: AWS_PROXY
+  #       Uri: !Sub 'arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${LambdaFunction.Arn}/invocations'
+  #     OperationName: 'lambda'
+  #     ResourceId: !Ref ApiGatewayResource
+  #     RestApiId: !Ref ApiGatewayRestApi
+
+  # ReceiptApiOptionsMethod:
+  #   Type: AWS::ApiGateway::Method
+  #   Properties:
+  #     AuthorizationType: NONE
+  #     HttpMethod: OPTIONS
+  #     ResourceId: !Ref ReceiptApiResource
+  #     RestApiId: !Ref ApiGatewayRestApi
+  #     Integration:
+  #       Type: MOCK
+  #       RequestTemplates:
+  #         application/json: '{"statusCode": 200}'
+  #       IntegrationResponses:
+  #         - StatusCode: 200
+  #           ResponseParameters:
+  #             method.response.header.Access-Control-Allow-Headers: "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token'"
+  #             method.response.header.Access-Control-Allow-Methods: "'POST,OPTIONS'"
+  #             method.response.header.Access-Control-Allow-Origin: "'*'"
+  #           ResponseTemplates:
+  #             application/json: ""
+  #     MethodResponses:
+  #       - StatusCode: 200
+  #         ResponseModels:
+  #           application/json: Empty
+  #         ResponseParameters:
+  #           method.response.header.Access-Control-Allow-Headers: TRUE
+  #           method.response.header.Access-Control-Allow-Methods: TRUE
+  #           method.response.header.Access-Control-Allow-Origin: TRUE
 
   # # Login Function API Gateway setup...
   # LoginApiResource:
@@ -451,7 +472,7 @@ Resources:
       - ListApiMethod
       - ReceiptApiMethod
       - ListApiOptionsMethod
-      - ReceiptApiOptionsMethod
+      # - ReceiptApiOptionsMethod
       # - LoginApiMethod
       # - RegisterApiMethod
 

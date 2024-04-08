@@ -1,0 +1,39 @@
+{
+  "customerEmail": "yashbest005@gmail.com",
+  "orderPlacedDate": "2024-04-07",
+  "orderPlacedTime": "15:34",
+  "discountRate": "10",
+  "taxPercentage": "15",
+  "products": [
+    {
+      "productId": 1,
+      "productTitle": "Wireless Noise-Cancelling Headphones",
+      "productDescription": "Experience crystal-clear sound and immersive audio with these premium noise-cancelling headphones. Lightweight and comfortable for all-day use.",
+      "productPrice": 199,
+      "productImage": "https://images.unsplash.com/photo-1629367494173-c78a56567877?ixlib=rb-4.0.3&ixid=MnwxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8&auto=format&fit=crop&w=927&q=80",
+      "productRating": 5,
+      "productSeller": "TechGear",
+      "quantity": 2
+    },
+    {
+      "productId": 2,
+      "productTitle": "Smart Watch with Fitness Tracker",
+      "productDescription": "Stay connected and track your fitness goals with this sleek and stylish smartwatch. Features include heart rate monitoring, GPS, and water resistance.",
+      "productPrice": 149,
+      "productImage": "https://m.media-amazon.com/images/I/71JU-bUt-sL.jpg",
+      "productRating": 4,
+      "productSeller": "GadgetHub",
+      "quantity": 3
+    },
+    {
+      "productId": 3,
+      "productTitle": "High-Performance Gaming Laptop",
+      "productDescription": "Dominate the gaming world with this powerful and ultra-fast gaming laptop. Equipped with the latest hardware and a stunning display.",
+      "productPrice": 1499,
+      "productImage": "https://m.media-amazon.com/images/I/51Qu24My+CL._AC_UF894,1000_QL80_.jpg",
+      "productRating": 4,
+      "productSeller": "TechPro",
+      "quantity": 1
+    }
+  ]
+}
