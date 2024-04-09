@@ -104,7 +104,7 @@ Resources:
           cd frontend
           sudo npm install
           sudo npm run build
-          sudo npm run preview 
+          sudo npm run preview -- --host
           # sudo cp -r /home/ec2-user/csci5409-term-assign/frontend/dist/* /usr/share/nginx/html/ || true
           # sudo systemctl restart nginx
 
