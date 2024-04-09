@@ -170,7 +170,10 @@ def lambda_handler(event, context):
             'statusCode': 200,
             'body': json.dumps({'message': 'Products retrieval successful.', 'products': all_products}),
             'headers': {
-                'Content-Type': 'application/json'
+                'Content-Type': 'application/json',
+                'Access-Control-Allow-Origin': '*', 
+                'Access-Control-Allow-Headers': 'Content-Type',
+                'Access-Control-Allow-Methods': 'GET'
             },
         }
     except Exception as e:
