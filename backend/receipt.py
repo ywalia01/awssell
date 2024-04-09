@@ -94,7 +94,7 @@ def send_receipt(email, receipt):
             Subject='Your Order Receipt',
         )
         # Optionally, delete the topic if it's not going to be reused
-        sns.delete_topic(TopicArn=topic_arn)
+        # sns.delete_topic(TopicArn=topic_arn)
     except Exception as e:
         error_message = f"Failed to send receipt to {email}: {str(e)}"
         raise Exception(error_message)
