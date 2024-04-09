@@ -10,17 +10,17 @@ Parameters:
       - prod
     Description: Enter dev or prod environment, default is dev.
 
-  KeyNameParameter:
-    Type: String
-    Description: Name of the existing key pair to be used for SSH access.
+  # KeyNameParameter:
+  #   Type: String
+  #   Description: Name of the existing key pair to be used for SSH access.
 
-  UserEmail:
-    Type: String
-    Description: Email of the user to subscribe to the SNS topic
+  # UserEmail:
+  #   Type: String
+  #   Description: Email of the user to subscribe to the SNS topic
 
-  JWTSecret:
-    Type: String
-    Description: JWT Secret
+  # JWTSecret:
+  #   Type: String
+  #   Description: JWT Secret
 
 Mappings:
   InstanceMap:
@@ -42,10 +42,9 @@ Resources:
   WebAppSecurityGroup:
     Type: AWS::EC2::SecurityGroup
     Properties:
-      # GroupName: !Join ["-", [webapp-security-group, dev]]
       GroupName:
         !Join ["-", [webapp-security-group, !Ref InstanceEnvironmentParameter]]
-      GroupDescription: "Allow HTTP/HTTPS and SSH inbound and outbound traffic"
+      GroupDescription: "Allow HTTP/HTTPS, SSH, and custom port inbound and outbound traffic"
       SecurityGroupIngress:
         - IpProtocol: tcp
           FromPort: 80
@@ -59,6 +58,10 @@ Resources:
           FromPort: 22
           ToPort: 22
           CidrIp: 0.0.0.0/0
+        - IpProtocol: tcp
+          CidrIp: 0.0.0.0/0
+          FromPort: 4173
+          ToPort: 4173
 
   WebAppEC2Instance:
     Type: "AWS::EC2::Instance"
@@ -79,34 +82,27 @@ Resources:
           !Ref "AWS::Region",
           !Ref InstanceEnvironmentParameter,
         ]
-      # KeyName: key-pair-cloud-term-project
-      KeyName: !Ref KeyNameParameter
+      KeyName: yash
+      # KeyName: !Ref KeyNameParameter
       SecurityGroups:
         - !Ref WebAppSecurityGroup
       UserData:
         Fn::Base64: !Sub |
           #!/bin/bash
-          # Update and install Node.js
-          sudo yum install nodejs nginx git -y
-          sudo systemctl enable nginx
-          sudo systemctl start nginx
+          # sudo yum install nodejs nginx git -y
+          sudo yum install nodejs git -y
+          # sudo systemctl enable nginx
+          # sudo systemctl start nginx
           curl --silent --location https://rpm.nodesource.com/setup_14.x | sudo bash -
-          # Create a directory for the app, navigate into it
           mkdir -p /home/ec2-user/csci5409-term-assign
           cd /home/ec2-user/csci5409-term-assign
-          # Fetch your app code (e.g., from S3 or Git)
-          # aws s3 cp s3://<your-bucket-name>/my-react-app.zip .
-          # unzip my-react-app.zip
-          # OR clone from a Git repository
           sudo git clone https://github.com/ywalia01/csci5409-term-assign.git .
           cd frontend
-          # Install your application's dependencies
           sudo npm install
-          # Build your Vite project
           sudo npm run build
-          # sudo npm run preview
-          sudo cp -r /home/ec2-user/csci5409-term-assign/frontend/dist/* /usr/share/nginx/html/ || true
-          sudo systemctl restart nginx
+          sudo npm run preview
+          # sudo cp -r /home/ec2-user/csci5409-term-assign/frontend/dist/* /usr/share/nginx/html/ || true
+          # sudo systemctl restart nginx
 
   MyEIP:
     Type: AWS::EC2::EIP
@@ -114,12 +110,12 @@ Resources:
     Properties:
       InstanceId: !Ref WebAppEC2Instance
 
-  JwtSecret:
-    Type: AWS::SecretsManager::Secret
-    Properties:
-      Name: !Sub "${InstanceEnvironmentParameter}/jwtSecret"
-      Description: "JWT secret key for authentication"
-      SecretString: !Ref JWTSecret
+  # JwtSecret:
+  #   Type: AWS::SecretsManager::Secret
+  #   Properties:
+  #     Name: !Sub "${InstanceEnvironmentParameter}/jwtSecret"
+  #     Description: "JWT secret key for authentication"
+  #     SecretString: !Ref JWTSecret
 
   DDBReceiptsSecret:
     Type: AWS::SecretsManager::Secret
@@ -173,8 +169,8 @@ Resources:
     DependsOn: MySNSTopic
     Properties:
       Protocol: email
-      # Endpoint: "yashbest005@gmail.com"
-      Endpoint: !Ref UserEmail
+      Endpoint: "yashbest005@gmail.com"
+      # Endpoint: !Ref UserEmail
       TopicArn: !Ref MySNSTopic
 
   ListFunction:
@@ -276,52 +272,33 @@ Resources:
       # MethodResponses:
       #   - StatusCode: 200
 
-  # ApiGatewayMethod:
-  #   Type: AWS::ApiGateway::Method
-  #   Properties:
-  #     ApiKeyRequired: false
-  #     AuthorizationType: NONE
-  #     HttpMethod: POST
-
-  #     Integration:
-  #       ConnectionType: INTERNET
-  #       Credentials: !GetAtt ApiGatewayIamRole.Arn
-  #       IntegrationHttpMethod: POST
-  #       PassthroughBehavior: WHEN_NO_MATCH
-  #       TimeoutInMillis: 29000
-  #       Type: AWS_PROXY
-  #       Uri: !Sub 'arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${LambdaFunction.Arn}/invocations'
-  #     OperationName: 'lambda'
-  #     ResourceId: !Ref ApiGatewayResource
-  #     RestApiId: !Ref ApiGatewayRestApi
-
-  # ReceiptApiOptionsMethod:
-  #   Type: AWS::ApiGateway::Method
-  #   Properties:
-  #     AuthorizationType: NONE
-  #     HttpMethod: OPTIONS
-  #     ResourceId: !Ref ReceiptApiResource
-  #     RestApiId: !Ref ApiGatewayRestApi
-  #     Integration:
-  #       Type: MOCK
-  #       RequestTemplates:
-  #         application/json: '{"statusCode": 200}'
-  #       IntegrationResponses:
-  #         - StatusCode: 200
-  #           ResponseParameters:
-  #             method.response.header.Access-Control-Allow-Headers: "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token'"
-  #             method.response.header.Access-Control-Allow-Methods: "'POST,OPTIONS'"
-  #             method.response.header.Access-Control-Allow-Origin: "'*'"
-  #           ResponseTemplates:
-  #             application/json: ""
-  #     MethodResponses:
-  #       - StatusCode: 200
-  #         ResponseModels:
-  #           application/json: Empty
-  #         ResponseParameters:
-  #           method.response.header.Access-Control-Allow-Headers: TRUE
-  #           method.response.header.Access-Control-Allow-Methods: TRUE
-  #           method.response.header.Access-Control-Allow-Origin: TRUE
+  ReceiptApiOptionsMethod:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      AuthorizationType: NONE
+      HttpMethod: OPTIONS
+      ResourceId: !Ref ReceiptApiResource
+      RestApiId: !Ref ApiGatewayRestApi
+      Integration:
+        Type: MOCK
+        RequestTemplates:
+          application/json: '{"statusCode": 200}'
+        IntegrationResponses:
+          - StatusCode: 200
+            ResponseParameters:
+              method.response.header.Access-Control-Allow-Headers: "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token'"
+              method.response.header.Access-Control-Allow-Methods: "'POST,OPTIONS'"
+              method.response.header.Access-Control-Allow-Origin: "'*'"
+            ResponseTemplates:
+              application/json: ""
+      MethodResponses:
+        - StatusCode: 200
+          ResponseModels:
+            application/json: Empty
+          ResponseParameters:
+            method.response.header.Access-Control-Allow-Headers: TRUE
+            method.response.header.Access-Control-Allow-Methods: TRUE
+            method.response.header.Access-Control-Allow-Origin: TRUE
 
   # # Login Function API Gateway setup...
   # LoginApiResource:
@@ -472,7 +449,7 @@ Resources:
       - ListApiMethod
       - ReceiptApiMethod
       - ListApiOptionsMethod
-      # - ReceiptApiOptionsMethod
+      - ReceiptApiOptionsMethod
       # - LoginApiMethod
       # - RegisterApiMethod
 
