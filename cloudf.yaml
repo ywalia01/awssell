@@ -62,6 +62,10 @@ Resources:
           CidrIp: 0.0.0.0/0
           FromPort: 4173
           ToPort: 4173
+        - IpProtocol: tcp
+          CidrIp: 0.0.0.0/0
+          FromPort: 5173
+          ToPort: 5173
 
   WebAppEC2Instance:
     Type: "AWS::EC2::Instance"
@@ -100,7 +104,7 @@ Resources:
           cd frontend
           sudo npm install
           sudo npm run build
-          sudo npm run preview
+          sudo npm run preview 
           # sudo cp -r /home/ec2-user/csci5409-term-assign/frontend/dist/* /usr/share/nginx/html/ || true
           # sudo systemctl restart nginx
 
